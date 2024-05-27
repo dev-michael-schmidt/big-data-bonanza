@@ -1,48 +1,45 @@
-from azure.storage.blob import BlobClient, ResourceTypes
+import io
 
+from azure.storage.blob import BlobClient, ResourceTypes
+from azure.storage.blob import BlobServiceClient
 
 import constants as c
 
-class BlobWorker(BlobClient):
 
-    def __init__(self, name, data=None):
+class BlobClientWorker:
 
-        self.container_name = c.CONTAINER_NAME
-        self.blob_name = c.BLOB_NAME
+    def __init__(self, account_url, credentials, container_name, blob_name, blob_data):
+        self.container_name = container_name
+        self.blob_name = blob_name
 
-        self.credentials = c.CREDENTIALS
-        self.account_url = c.ACCOUNT_URL
+        self.credentials = credentials
+        self.account_url = account_url
 
-        self.data = data
-        super().__init__(self.account_url,
-                         self.credentials,
-                         self.blob_name)
+        self.blob_data = blob_data
 
-        self.resource_types = ResourceTypes(service=True)
-        self.resource = 'file'
-
+        self.client = BlobServiceClient(account_url, credentials).get_blob_client(self.container_name, blob_name)
 
     def push(self):
+        if self.blob_data:
+            self.client.upload_blob(self.blob_data)
 
-        if self.data:
-            self.upload_blob(self.data)
+    def pull(self):
+        if self.client.exists():
+            return self.client.download_blob()
 
     def pop(self):
-
-        data = self.peek()
-        self.delete_blob()
-        return data
-
-    def peek(self):
-
-        data = self.download_blob()
-        return data
+        if self.client.exists():
+            data = self.client.download_blob()
+            self.client.delete_blob()
+            return data
 
 
 def main():
-
     # TODO open a file instead of 'foo'
-    worker = BlobWorker('__main__', b'foo')
+    fh = open('sample_data.txt', 'rb')
+    worker = BlobClientWorker(c.ACCOUNT_URL, c.CREDENTIALS, c.CONTAINER_NAME, c.BLOB_NAME, fh)
+    data = worker.pull()
+    pass
 
 
 if __name__ == "__main__":
